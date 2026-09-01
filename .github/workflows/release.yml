@@ -1,0 +1,126 @@
+name: Immutable capability checker release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Existing annotated tag to publish'
+        required: true
+        default: 'v0.1.0'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    env:
+      RELEASE_TAG: ${{ inputs.tag_name || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout exact annotated tag
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag and immutable-release setting
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch --force --no-tags origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+          git checkout --detach "refs/tags/${RELEASE_TAG}"
+          tag_object=$(git rev-parse "refs/tags/${RELEASE_TAG}")
+          test "$(git cat-file -t "$tag_object")" = tag
+          tag_commit=$(git rev-list -n 1 "${tag_object}^{commit}")
+          test "$tag_commit" = "$(git rev-parse HEAD)"
+          setting=$(gh api "repos/${GITHUB_REPOSITORY}/immutable-releases")
+          test "$(jq -r '.enabled' <<<"$setting")" = true
+
+      - name: Set up Go 1.27.0
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.0'
+          cache: false
+
+      - name: Re-run verification and package evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(go env GOVERSION)" = "go1.27.0"
+          work="$RUNNER_TEMP/gooo-capability-effect-checker-release"
+          mkdir -p "$work/timing"
+          test -z "$(gofmt -l $(git ls-files '*.go'))"
+          go vet ./...
+          ./scripts/measure-command.sh "$work/timing/build.json" -- \
+            go build -trimpath -o "$work/gooo-capability-effect-checker" ./cmd/gooo-capability-effect-checker
+          ./scripts/measure-command.sh "$work/timing/test.json" -- sh -c \
+            "go test -json -count=1 ./... > '$work/go-test.json'"
+          bash scripts/conformance.sh "$GITHUB_WORKSPACE" "$work" "$work/gooo-capability-effect-checker"
+          ./scripts/measure-command.sh "$work/timing/compile.json" -- \
+            go tool compile -o "$work/generated-checker.o" "$work/conformance-output/generated/checker.go"
+          ./scripts/measure-command.sh "$work/timing/integration.json" -- \
+            bash scripts/integration.sh "$GITHUB_WORKSPACE" "$work" "$work/gooo-capability-effect-checker"
+          ./scripts/write-metrics.sh "$GITHUB_WORKSPACE" "$work" "$work/ci-metrics.json"
+          source_asset="$work/gooo-capability-effect-checker-${RELEASE_TAG#v}.tar.gz"
+          tag_commit=$(git rev-parse HEAD)
+          git archive --format=tar.gz --prefix="gooo-capability-effect-checker-${RELEASE_TAG#v}/" "$tag_commit" > "$source_asset"
+          cp "$work/conformance-output/run-report.json" "$work/run-report.json"
+          tag_object=$(git rev-parse "refs/tags/${RELEASE_TAG}")
+          jq -S -n \
+            --arg tag "$RELEASE_TAG" --arg commit "$tag_commit" --arg tag_object "$tag_object" \
+            --arg source_name "$(basename "$source_asset")" \
+            --arg source_digest "sha256:$(sha256sum "$source_asset" | awk '{print $1}')" \
+            --argjson source_bytes "$(stat -c '%s' "$source_asset")" \
+            --arg metrics_digest "sha256:$(sha256sum "$work/ci-metrics.json" | awk '{print $1}')" \
+            --argjson metrics_bytes "$(stat -c '%s' "$work/ci-metrics.json")" \
+            --arg run_report_digest "sha256:$(sha256sum "$work/run-report.json" | awk '{print $1}')" \
+            --argjson run_report_bytes "$(stat -c '%s' "$work/run-report.json")" \
+            '{schema:"gooo/capability-effect-checker/release-manifest/v1",tag:$tag,commit:$commit,annotated_tag_object:$tag_object,immutable:true,assets:[{name:$source_name,bytes:$source_bytes,digest:$source_digest},{name:"ci-metrics.json",bytes:$metrics_bytes,digest:$metrics_digest},{name:"run-report.json",bytes:$run_report_bytes,digest:$run_report_digest}],authority:{repository_writes:0,local_test_executions:0,cross_project_required_gates:0}}' \
+            > "$work/release-manifest.json"
+          (cd "$work" && sha256sum "$(basename "$source_asset")" ci-metrics.json run-report.json release-manifest.json) > "$work/SHA256SUMS"
+
+      - name: Publish release once
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/gooo-capability-effect-checker-release"
+          gh release create "$RELEASE_TAG" \
+            --verify-tag \
+            --title "gooo-capability-effect-checker $RELEASE_TAG" \
+            --notes "Immutable capability/effect checker release for annotated commit $(git rev-parse HEAD)." \
+            "$work/gooo-capability-effect-checker-${RELEASE_TAG#v}.tar.gz" \
+            "$work/ci-metrics.json" "$work/run-report.json" "$work/release-manifest.json" "$work/SHA256SUMS"
+
+      - name: Audit immutable release through GitHub API
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/gooo-capability-effect-checker-release"
+          release=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")
+          test "$(jq -r '.immutable' <<<"$release")" = true
+          tag_ref=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")
+          test "$(jq -r '.object.type' <<<"$tag_ref")" = tag
+          tag_object=$(jq -r '.object.sha' <<<"$tag_ref")
+          tag=$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object}")
+          test "$(jq -r '.object.sha' <<<"$tag")" = "$(git rev-parse HEAD)"
+          for asset in "gooo-capability-effect-checker-${RELEASE_TAG#v}.tar.gz" ci-metrics.json run-report.json release-manifest.json SHA256SUMS; do
+            expected="sha256:$(sha256sum "$work/$asset" | awk '{print $1}')"
+            actual=$(jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .digest' <<<"$release")
+            test "$actual" = "$expected"
+          done
+          jq -n --arg tag "$RELEASE_TAG" --arg tag_object "$tag_object" \
+            --arg commit "$(git rev-parse HEAD)" --argjson release "$(jq '{id,tag_name,immutable,assets:[.assets[] | {id,name,size,digest}]}' <<<"$release")" \
+            '{schema:"gooo/capability-effect-checker/github-release-audit/v1",tag:$tag,annotated_tag_object:$tag_object,commit:$commit,release:$release}' \
+            > "$work/release-audit.json"
+
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: gooo-capability-effect-checker-release-${{ github.run_id }}
+          path: ${{ runner.temp }}/gooo-capability-effect-checker-release
+          include-hidden-files: true
+          if-no-files-found: error

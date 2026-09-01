@@ -1,0 +1,8 @@
+gooo 1
+scenario indirect-repository-write
+root generator
+function generator
+function helper
+direct generator READ_INPUT WRITE_CALLER_OUTPUT
+direct helper REPOSITORY_WRITE
+call generator helper

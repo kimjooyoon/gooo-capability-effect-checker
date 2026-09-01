@@ -1,0 +1,8 @@
+gooo 1
+scenario indirect-missing-grant
+root generator
+function generator
+function helper
+direct generator READ_INPUT WRITE_CALLER_OUTPUT
+direct helper NETWORK
+call generator helper

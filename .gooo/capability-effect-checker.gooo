@@ -1,0 +1,53 @@
+gooo 1
+package capability_effect_checker
+namespace gooo://capability-effect-checker/v1
+
+# This file is the semantic authority. Go parses, executes, and emits it.
+effect READ_INPUT
+effect WRITE_CALLER_OUTPUT
+effect REPOSITORY_WRITE
+effect NETWORK
+effect CI_MUTATION
+effect RELEASE_MUTATION
+
+capability generator
+capability helper
+capability policy-checker
+
+precedence REFUTED UNKNOWN CLOSED
+unknown_fields stage step reason unknown_class next_operation blocked_by
+risk_effects REPOSITORY_WRITE CI_MUTATION RELEASE_MUTATION
+
+classification direct_undeclared_effect REFUTED
+classification declared_grant_omission REFUTED
+classification forbidden_mutation REFUTED
+classification missing_indirect_grant UNKNOWN
+classification external_oracle_dependency UNKNOWN
+classification unknown_call_target UNKNOWN
+classification call_graph_cycle REFUTED
+
+diagnostic direct_undeclared_effect EFFECTS CHECK_EFFECT_VOCABULARY EFFECT_NOT_IN_EFFECT_SET UNDECLARED_EFFECT DECLARE_EFFECT EFFECT_NAME
+diagnostic declared_grant_omission GRANTS CHECK_DECLARED_GRANT DECLARED_EFFECT_ESCAPES_GRANT GRANT_MISMATCH REVISE_GRANT DECLARED_GRANT
+diagnostic forbidden_mutation EFFECTS CHECK_MUTATION_GRANT FORBIDDEN_MUTATION_ESCAPES_GRANT EFFECT_ESCALATION REJECT_CALL_PATH CALL_PATH
+diagnostic missing_indirect_grant GRANTS CHECK_CALLEE_GRANT INDIRECT_GRANT_MISSING INDIRECT_GRANT DECLARE_CALLEE_GRANT CALLEE_GRANT
+diagnostic external_oracle_dependency ORACLE RESOLVE_EXTERNAL_ORACLE EXTERNAL_ORACLE_UNAVAILABLE EXTERNAL_ORACLE RETRY_EXTERNAL_ORACLE ORACLE_RESPONSE
+diagnostic unknown_call_target GRAPH RESOLVE_CALL_TARGET CALL_TARGET_MISSING UNRESOLVED_CALL DECLARE_TARGET CALL_TARGET
+diagnostic call_graph_cycle GRAPH CHECK_CALL_GRAPH_CYCLE CALL_GRAPH_CYCLE GRAPH_CYCLE REPAIR_CALL_GRAPH CALL_PATH
+
+denominator cases 5
+case safe-generator safe-generator.gooo CLOSED generator generator
+case repository-write-escalation repository-write-escalation.gooo REFUTED generator generator
+case indirect-missing-grant indirect-missing-grant.gooo UNKNOWN generator generator
+case indirect-repository-write indirect-repository-write.gooo REFUTED generator generator
+case external-oracle external-oracle.gooo UNKNOWN generator generator
+
+grant safe-generator generator READ_INPUT WRITE_CALLER_OUTPUT
+grant safe-generator helper READ_INPUT
+grant repository-write-escalation generator READ_INPUT WRITE_CALLER_OUTPUT
+grant indirect-missing-grant generator READ_INPUT NETWORK WRITE_CALLER_OUTPUT
+grant indirect-repository-write generator READ_INPUT WRITE_CALLER_OUTPUT
+grant external-oracle generator READ_INPUT WRITE_CALLER_OUTPUT
+
+plan parser executor emitter
+generation output caller-owned-temporary-directory
+generation steps parse-phase parse-fixtures infer-call-graph compare-grants emit-checker write-report

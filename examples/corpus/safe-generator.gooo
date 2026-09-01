@@ -1,0 +1,8 @@
+gooo 1
+scenario safe-generator
+root generator
+function generator
+function helper
+direct generator READ_INPUT WRITE_CALLER_OUTPUT
+direct helper READ_INPUT
+call generator helper
