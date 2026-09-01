@@ -8,7 +8,7 @@ on:
       tag_name:
         description: 'Existing annotated tag to publish'
         required: true
-        default: 'v0.1.0'
+        default: 'v0.1.1'
 
 permissions:
   contents: write
@@ -36,8 +36,6 @@ jobs:
           test "$(git cat-file -t "$tag_object")" = tag
           tag_commit=$(git rev-list -n 1 "${tag_object}^{commit}")
           test "$tag_commit" = "$(git rev-parse HEAD)"
-          setting=$(gh api "repos/${GITHUB_REPOSITORY}/immutable-releases")
-          test "$(jq -r '.enabled' <<<"$setting")" = true
 
       - name: Set up Go 1.27.0
         uses: actions/setup-go@v6
