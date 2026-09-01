@@ -1,0 +1,16 @@
+{
+  "schema": "gooo/capability-effect-checker/bootstrap-lock/v1",
+  "repository": "kimjooyoon/gooo-capability-effect-checker",
+  "bootstrap": {
+    "repository": "kimjooyoon/gooo-repository-bootstrap",
+    "release": "v0.1.1",
+    "release_url": "https://github.com/kimjooyoon/gooo-repository-bootstrap/releases/tag/v0.1.1",
+    "asset": "gooo-evidence-0.1.1.json",
+    "asset_digest": "sha256:dc204e92d219e291b9568f18affd556f226fc54114c008d00e6189ea169c9076",
+    "bootstrap_commit_paths": [".gitignore", "LICENSE", "README.md"],
+    "bootstrap_exception": "BOOTSTRAP_EXCEPTION"
+  },
+  "authority": "gooo/capability-effect-checker.gooo",
+  "post_bootstrap_direct_main": 0,
+  "improvement_pair": "UNKNOWN_WITHOUT_SAME_SCENARIO_SOURCE_CONTRACT_TOOLCHAIN_DIGESTS"
+}

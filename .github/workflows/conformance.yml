@@ -1,0 +1,131 @@
+name: Capability effect conformance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    runs-on: ubuntu-24.04
+    env:
+      SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Go 1.27.0
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.0'
+          cache: false
+
+      - name: Verify toolchain and clean checkout
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(go env GOVERSION)" = "go1.27.0"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Verify Go formatting and vet
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          files=$(git ls-files '*.go')
+          test -z "$(gofmt -l $files)"
+          go vet ./...
+
+      - name: Build checker
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/gooo-capability-effect-checker"
+          mkdir -p "$work/timing"
+          ./scripts/measure-command.sh "$work/timing/build.json" -- \
+            go build -trimpath -o "$work/gooo-capability-effect-checker" ./cmd/gooo-capability-effect-checker
+
+      - name: Run Go tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/gooo-capability-effect-checker"
+          ./scripts/measure-command.sh "$work/timing/test.json" -- sh -c \
+            "go test -json -count=1 ./... > '$work/go-test.json'"
+
+      - name: Run fixed Gooo corpus and replay
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/gooo-capability-effect-checker"
+          bash scripts/conformance.sh "$GITHUB_WORKSPACE" "$work" "$work/gooo-capability-effect-checker"
+
+      - name: Compile generated checker artifact
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/gooo-capability-effect-checker"
+          ./scripts/measure-command.sh "$work/timing/compile.json" -- \
+            go tool compile -o "$work/generated-checker.o" "$work/conformance-output/generated/checker.go"
+
+      - name: Run caller-owned temporary integration
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/gooo-capability-effect-checker"
+          ./scripts/measure-command.sh "$work/timing/integration.json" -- \
+            bash scripts/integration.sh "$GITHUB_WORKSPACE" "$work" "$work/gooo-capability-effect-checker"
+
+      - name: Write exact CI metrics
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/gooo-capability-effect-checker"
+          ./scripts/write-metrics.sh "$GITHUB_WORKSPACE" "$work" "$work/ci-metrics.json"
+          jq -e '
+            (.inventory.go_files | type == "number" and floor == .) and
+            (.inventory.gooo_files | type == "number" and floor == .) and
+            (.inventory.go_physical_lines | type == "number" and floor == .) and
+            (.inventory.gooo_physical_lines | type == "number" and floor == .) and
+            (.inventory.subdirectories | type == "number" and floor == .) and
+            (.inventory.regular_files | type == "number" and floor == .) and
+            (.inventory.root_readme_inventory_excluded == 1) and
+            (.outputs.count | type == "number" and floor == .) and
+            (.outputs.bytes | type == "number" and floor == .) and
+            (.outputs.generated_artifacts.count == 1) and
+            (.outputs.generated_artifacts.bytes | type == "number" and floor == .) and
+            (.resources.peak_rss_bytes | type == "number" and floor == .) and
+            (.resources.peak_rss_kib | type == "number" and floor == .) and
+            (.wall_ms.compile | type == "number" and floor == .) and
+            (.wall_ms.build | type == "number" and floor == .) and
+            (.wall_ms.test | type == "number" and floor == .) and
+            (.wall_ms.conformance | type == "number" and floor == .) and
+            (.wall_ms.integration | type == "number" and floor == .) and
+            (.tests.total == 5 and .tests.selected == 5 and .tests.executed == 5 and .tests.reused == 0 and .tests.failed == 0 and .tests.unknown == 2) and
+            (.authority.repository_writes == 0 and .authority.local_test_executions == 0 and .authority.cross_project_required_gates == 0) and
+            (.improvement.status == "UNKNOWN")
+          ' "$work/ci-metrics.json"
+
+      - name: Publish human report to job summary
+        if: always()
+        shell: bash
+        run: |
+          work="$RUNNER_TEMP/gooo-capability-effect-checker"
+          if [ -f "$work/conformance-output/human-report.md" ]; then
+            cat "$work/conformance-output/human-report.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: gooo-capability-effect-checker-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/gooo-capability-effect-checker
+          include-hidden-files: true
+          if-no-files-found: error

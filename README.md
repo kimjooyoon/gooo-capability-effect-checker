@@ -21,3 +21,19 @@ contains a safe generator, a forbidden repository-write fixture, the two
 indirect-grant distinctions, and an external-oracle case. Local validation is
 not the evidence authority; the authoritative build, tests, conformance run,
 and metrics come from GitHub Actions.
+
+## Run in CI
+
+```text
+go run ./cmd/gooo-capability-effect-checker generate \
+  --phase .gooo/capability-effect-checker.gooo \
+  --corpus-root examples/corpus \
+  --out /caller-owned/output \
+  --source-root .
+```
+
+The generated report contains exact inferred effects, declared grants,
+shortest offending paths, and the complete six-field UNKNOWN frontier. The
+bootstrap lock is recorded in
+[`contracts/bootstrap-lock-v1.json`](contracts/bootstrap-lock-v1.json), and
+the protocol is described in [`docs/rfc-v1.md`](docs/rfc-v1.md).

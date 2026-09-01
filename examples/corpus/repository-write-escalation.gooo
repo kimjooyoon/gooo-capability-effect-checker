@@ -1,0 +1,5 @@
+gooo 1
+scenario repository-write-escalation
+root generator
+function generator
+direct generator READ_INPUT REPOSITORY_WRITE

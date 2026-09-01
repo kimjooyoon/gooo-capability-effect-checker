@@ -1,0 +1,6 @@
+gooo 1
+scenario external-oracle
+root generator
+function generator
+direct generator READ_INPUT WRITE_CALLER_OUTPUT
+oracle generator github-ruleset unavailable
