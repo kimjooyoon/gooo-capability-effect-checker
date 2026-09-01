@@ -55,7 +55,7 @@ rss_kib=$(awk -F: '/Maximum resident set size/ {gsub(/^[[:space:]]+/, "", $2); p
 rss_kib=${rss_kib:-0}
 rss_bytes=$((rss_kib * 1024))
 jq -n \
-	--argjson wall_ms "$wall" --argjson peak_rss_kib "$rss_kib" --argjson peak_rss_bytes "$rss_bytes" \
+	--argjson wall "$wall" --argjson peak_rss_kib "$rss_kib" --argjson peak_rss_bytes "$rss_bytes" \
 	--argjson output_files "$output_files" --argjson output_bytes "$output_bytes" \
 	--argjson generated_files "$generated_files" --argjson generated_bytes "$generated_bytes" \
 	'{schema:"gooo/capability-effect-checker/conformance/v1",tests:{total:5,selected:5,executed:5,reused:0,failed:0,unknown:2},cases:{closed:1,unknown:2,refuted:2},outputs:{count:$output_files,bytes:$output_bytes,generated_artifacts:{count:$generated_files,bytes:$generated_bytes}},resources:{peak_rss_kib:$peak_rss_kib,peak_rss_bytes:$peak_rss_bytes},wall_ms:$wall}' \
