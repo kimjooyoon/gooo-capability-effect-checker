@@ -5,9 +5,12 @@ The v0.1.1 public release remains immutable and is recorded by release ID
 archive, release manifest, and SHA256SUMS are historical evidence.
 
 The v2 change is PR-first: the pull request conformance job is green before
-merge, then the same subject is checked on `main`. The next patch release is
-not created by this change; the release workflow defaults to annotated
-`v0.1.2`. When a maintainer creates that tag, CI will:
+merge, then the same subject is checked on `main`. The first v0.1.2 release
+attempt is preserved as a burned draft because its draft asset audit could not
+use the tag lookup endpoint; the exact failure is recorded in
+[`contracts/release-receipt-v0.1.2.json`](../contracts/release-receipt-v0.1.2.json).
+The follow-up fix is PR-first as well, and the next fresh patch release is
+`v0.1.3`. When a maintainer creates that tag, CI will:
 
 1. verify the annotated tag and its merged-PR lineage;
 2. verify the `.gooo` output-authority policy before any remote mutation;

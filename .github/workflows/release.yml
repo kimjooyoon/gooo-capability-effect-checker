@@ -8,7 +8,7 @@ on:
       tag_name:
         description: 'Existing annotated tag to publish'
         required: true
-        default: 'v0.1.2'
+        default: 'v0.1.3'
 
 permissions:
   contents: write
@@ -109,7 +109,8 @@ jobs:
         run: |
           set -Eeuo pipefail
           work="$RUNNER_TEMP/gooo-capability-effect-checker-release"
-          draft=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")
+          draft=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
+            jq --arg tag "$RELEASE_TAG" '[.[] | select(.tag_name == $tag and .draft == true)] | if length == 1 then .[0] else error("expected exactly one draft release") end')
           test "$(jq -r '.draft' <<<"$draft")" = true
           for asset in "gooo-capability-effect-checker-${RELEASE_TAG#v}.tar.gz" ci-metrics.json run-report.json release-manifest.json SHA256SUMS; do
             expected="sha256:$(sha256sum "$work/$asset" | awk '{print $1}')"

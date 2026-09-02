@@ -34,6 +34,9 @@ append-only contract in
 [`contracts/denominator-v2.json`](contracts/denominator-v2.json). The public
 immutable v0.1.1 artifact is not rewritten. Its audit is recorded in
 [`docs/release-history-v1.md`](docs/release-history-v1.md).
+The failed v0.1.2 draft is intentionally preserved and burned; its exact
+asset-audit receipt is in
+[`contracts/release-receipt-v0.1.2.json`](contracts/release-receipt-v0.1.2.json).
 
 ## CI authority
 
@@ -46,8 +49,9 @@ cross-project required gates.
 
 The release workflow checks PR-first lineage and caller-owned output before
 any remote mutation, creates the next patch release as a draft, audits its
-asset digests, and only then publishes the immutable release. Existing public
-releases are append-only.
+asset digests, and only then publishes the immutable release. After the burned
+v0.1.2 draft, the fresh next patch is v0.1.3. Existing public releases are
+append-only.
 
 ## CI command
 

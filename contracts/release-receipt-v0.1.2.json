@@ -1,0 +1,26 @@
+{
+  "schema": "gooo/capability-effect-checker/release-receipt/v1",
+  "status": "OPERATIONAL_REFUTED",
+  "failure_class": "DRAFT_ASSET_AUDIT_FAILED",
+  "version": "v0.1.2",
+  "disposition": "BURNED",
+  "failed_run_id": 33621843176,
+  "failed_run_url": "https://github.com/kimjooyoon/gooo-capability-effect-checker/actions/runs/33621843176",
+  "reason": "The draft release was created successfully, but GitHub returned HTTP 404 for the releases-by-tag endpoint while the release was still draft. The draft and all uploaded assets are preserved unchanged.",
+  "release": {
+    "id": 381176380,
+    "api_url": "https://api.github.com/repos/kimjooyoon/gooo-capability-effect-checker/releases/381176380",
+    "tag": "v0.1.2",
+    "draft": true,
+    "immutable": false,
+    "annotated_tag_object": "b3ea6976050fb2dd7a5ca070bddd4a0c90688720",
+    "commit": "260bbb963ce3e523d5e0d7ea32c117965b6b21fd"
+  },
+  "assets": [
+    {"id": 541040232, "name": "SHA256SUMS", "bytes": 362, "digest": "sha256:b5ce97de522553ee765738b00a59b16411aa0c33f43319b0a2f0f765eddf1638"},
+    {"id": 541040233, "name": "ci-metrics.json", "bytes": 1465, "digest": "sha256:0a474e3a2159c352bd6e6ee6b9898564b3809067fae3c19594427d396856b94a"},
+    {"id": 541040234, "name": "gooo-capability-effect-checker-0.1.2.tar.gz", "bytes": 35937, "digest": "sha256:34187a8c0649b09f3c352d437b4240367724977bc2b0d2c565459f32eccdaaba"},
+    {"id": 541040236, "name": "release-manifest.json", "bytes": 1289, "digest": "sha256:7344751bba909d4fff86879b1d3b1521c23c241b45c56a6fae4d181a456ccebc"},
+    {"id": 541040237, "name": "run-report.json", "bytes": 49110, "digest": "sha256:afceec614963f46615c18e075abefc82ecf8e836c98feb2f1acafbc56233cf6a"}
+  ]
+}
