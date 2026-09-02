@@ -1,0 +1,11 @@
+gooo 2
+scenario missing-path-scope
+root metacode:generator
+function metacode:generator
+function generated:generator
+function runtime:generator
+direct metacode:generator READ_INPUT
+direct generated:generator GENERATE_CALLER_OUTPUT
+direct runtime:generator NONE
+call metacode:generator generated:generator
+call generated:generator runtime:generator

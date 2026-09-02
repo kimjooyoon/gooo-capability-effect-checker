@@ -15,8 +15,16 @@ subdirectories=$(git -C "$root" ls-files | awk -F/ 'NF > 1 {for (i=1; i<NF; i++)
 timing_peak=$(jq -s 'map(.peak_rss_bytes) | max' "$work"/timing/*.json)
 timing_peak=${timing_peak:-0}
 peak_kib=$((timing_peak / 1024))
+phase_digest="sha256:$(sha256sum "$root/.gooo/capability-effect-checker.gooo" | awk '{print $1}')"
+semantic_ir_digest=$(jq -r '.semantic_ir_digest' "$work/conformance-output/run-report.json")
+run_report_digest="sha256:$(sha256sum "$work/conformance-output/run-report.json" | awk '{print $1}')"
+source_commit=$(git -C "$root" rev-parse HEAD)
 
 jq -n \
+	--arg source_commit "$source_commit" \
+	--arg phase_digest "$phase_digest" \
+	--arg semantic_ir_digest "$semantic_ir_digest" \
+	--arg run_report_digest "$run_report_digest" \
 	--argjson go_files "$go_files" --argjson gooo_files "$gooo_files" \
 	--argjson go_lines "$go_lines" --argjson gooo_lines "$gooo_lines" \
 	--argjson regular_files "$regular_files" --argjson subdirectories "$subdirectories" \
@@ -36,5 +44,5 @@ jq -n \
 	--argjson reused "$(jq -r '.tests.reused' "$work/conformance-report.json")" \
 	--argjson failed "$(jq -r '.tests.failed' "$work/conformance-report.json")" \
 	--argjson unknown "$(jq -r '.tests.unknown' "$work/conformance-report.json")" \
-	'{schema:"gooo/capability-effect-checker/ci-metrics/v1",inventory:{go_files:$go_files,gooo_files:$gooo_files,go_physical_lines:$go_lines,gooo_physical_lines:$gooo_lines,subdirectories:$subdirectories,regular_files:$regular_files,root_readme_inventory_excluded:1},outputs:{count:$output_count,bytes:$output_bytes,generated_artifacts:{count:$generated_count,bytes:$generated_bytes}},resources:{peak_rss_bytes:$peak_bytes,peak_rss_kib:$peak_kib},wall_ms:{compile:$compile_ms,build:$build_ms,test:$test_ms,conformance:$conformance_ms,integration:$integration_ms},tests:{total:$total,selected:$selected,executed:$executed,reused:$reused,failed:$failed,unknown:$unknown},authority:{repository_writes:0,local_test_executions:0,cross_project_required_gates:0},improvement:{status:"UNKNOWN",reason:"NO_SAME_SCENARIO_SOURCE_CONTRACT_TOOLCHAIN_BEFORE_AFTER_PAIR"}}' \
+	'{schema:"gooo/capability-effect-checker/ci-metrics/v2",inventory:{go_files:$go_files,gooo_files:$gooo_files,go_physical_lines:$go_lines,gooo_physical_lines:$gooo_lines,subdirectories:$subdirectories,regular_files:$regular_files,root_readme_inventory_excluded:1},outputs:{count:$output_count,bytes:$output_bytes,generated_artifacts:{count:$generated_count,bytes:$generated_bytes}},resources:{peak_rss_bytes:$peak_bytes,peak_rss_kib:$peak_kib},wall_ms:{compile:$compile_ms,build:$build_ms,test:$test_ms,conformance:$conformance_ms,integration:$integration_ms},tests:{total:$total,selected:$selected,executed:$executed,reused:$reused,failed:$failed,unknown:$unknown},authority:{repository_writes:0,local_test_executions:0,cross_project_required_gates:0},lineage:{source_commit:$source_commit,phase_digest:$phase_digest,semantic_ir_digest:$semantic_ir_digest,run_report_digest:$run_report_digest},improvement:{status:"UNKNOWN",reason:"NO_SAME_SCENARIO_SOURCE_CONTRACT_TOOLCHAIN_BEFORE_AFTER_PAIR"},external_utility:{status:"UNKNOWN",reason:"NO_EXTERNAL_UTILITY_EVIDENCE"}}' \
 	> "$output"

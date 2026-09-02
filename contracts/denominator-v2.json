@@ -1,0 +1,53 @@
+{
+  "schema": "gooo/capability-effect-checker/denominator/v2",
+  "status": "active-append-only",
+  "supersedes": "contracts/denominator-v1.json",
+  "phase_digest": "sha256:8018bcc48e3b94971725a3ef177a0c346f16aa64dfc65d41e1252cf406ba0273",
+  "effects": ["READ_INPUT", "NETWORK_READ_PINNED", "GENERATE_CALLER_OUTPUT", "REPOSITORY_WRITE", "REMOTE_MUTATION", "DESTRUCTIVE_DELETE"],
+  "stages": ["METACODE", "GENERATED_CODE", "RUNTIME"],
+  "stage_edges": [["METACODE", "GENERATED_CODE"], ["GENERATED_CODE", "RUNTIME"]],
+  "output_scope": "caller-owned",
+  "fixed_point": "explicit",
+  "denominator": 12,
+  "cohorts": {"FOUNDATION": 4, "COHERENCE": 4, "REGRESSION": 4},
+  "proof": {"FOUNDATION": 4, "COHERENCE": 4, "REGRESSION": 4},
+  "indicators": {"DRIVER": 4, "OUTCOME": 4, "GUARDRAIL": 4},
+  "cases": [
+    {"id": "exact-attenuation", "expected": "CLOSED"},
+    {"id": "zero-effect-generated", "expected": "CLOSED"},
+    {"id": "caller-owned-output", "expected": "CLOSED"},
+    {"id": "pinned-network-read", "expected": "CLOSED"},
+    {"id": "missing-grant", "expected": "UNKNOWN"},
+    {"id": "missing-call-edge", "expected": "UNKNOWN"},
+    {"id": "unknown-generated-effect", "expected": "UNKNOWN"},
+    {"id": "missing-path-scope", "expected": "UNKNOWN"},
+    {"id": "repo-write-amplification", "expected": "REFUTED"},
+    {"id": "remote-mutation-amplification", "expected": "REFUTED"},
+    {"id": "destructive-ancestor-delete", "expected": "REFUTED"},
+    {"id": "forged-grant", "expected": "REFUTED"}
+  ],
+  "decision_vector": ["CLOSED", "CLOSED", "CLOSED", "CLOSED", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "REFUTED", "REFUTED", "REFUTED", "REFUTED"],
+  "effect_vectors": [
+    {"id": "exact-attenuation", "effects": ["GENERATE_CALLER_OUTPUT", "READ_INPUT"]},
+    {"id": "zero-effect-generated", "effects": ["GENERATE_CALLER_OUTPUT", "READ_INPUT"]},
+    {"id": "caller-owned-output", "effects": ["GENERATE_CALLER_OUTPUT", "READ_INPUT"]},
+    {"id": "pinned-network-read", "effects": ["NETWORK_READ_PINNED", "READ_INPUT"]},
+    {"id": "missing-grant", "effects": ["GENERATE_CALLER_OUTPUT", "NETWORK_READ_PINNED", "READ_INPUT"]},
+    {"id": "missing-call-edge", "effects": ["GENERATE_CALLER_OUTPUT", "READ_INPUT"]},
+    {"id": "unknown-generated-effect", "effects": ["GENERATED_EFFECT_UNKNOWN", "GENERATE_CALLER_OUTPUT", "READ_INPUT"]},
+    {"id": "missing-path-scope", "effects": ["GENERATE_CALLER_OUTPUT", "READ_INPUT"]},
+    {"id": "repo-write-amplification", "effects": ["GENERATE_CALLER_OUTPUT", "READ_INPUT", "REPOSITORY_WRITE"]},
+    {"id": "remote-mutation-amplification", "effects": ["GENERATE_CALLER_OUTPUT", "READ_INPUT", "REMOTE_MUTATION"]},
+    {"id": "destructive-ancestor-delete", "effects": ["DESTRUCTIVE_DELETE", "GENERATE_CALLER_OUTPUT", "READ_INPUT"]},
+    {"id": "forged-grant", "effects": ["GENERATE_CALLER_OUTPUT", "READ_INPUT"]}
+  ],
+  "authority": {
+    "repository_writes": 0,
+    "local_test_executions": 0,
+    "cross_project_required_gates": 0
+  },
+  "evidence": {
+    "improvement": "UNKNOWN",
+    "external_utility": "UNKNOWN"
+  }
+}

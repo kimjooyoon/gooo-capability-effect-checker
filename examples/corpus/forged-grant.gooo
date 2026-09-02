@@ -1,0 +1,13 @@
+gooo 2
+scenario forged-grant
+root metacode:generator
+function metacode:generator
+function generated:generator
+function runtime:generator
+direct metacode:generator READ_INPUT
+direct generated:generator NONE
+direct runtime:generator GENERATE_CALLER_OUTPUT
+call metacode:generator generated:generator
+call generated:generator runtime:generator
+generated_grant generated:generator generator REPOSITORY_WRITE
+output caller-owned
