@@ -1,0 +1,13 @@
+gooo 2
+scenario missing-call-edge
+root metacode:generator
+function metacode:generator
+function generated:generator
+function runtime:generator
+direct metacode:generator READ_INPUT
+direct generated:generator READ_INPUT
+direct runtime:generator GENERATE_CALLER_OUTPUT
+call metacode:generator generated:generator
+call generated:generator runtime:generator
+ambiguous_call generated:generator runtime:generator runtime:alternate
+output caller-owned

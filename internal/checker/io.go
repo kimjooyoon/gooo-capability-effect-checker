@@ -19,11 +19,11 @@ func Generate(options GenerateOptions) (RunReport, error) {
 	if options.PhasePath == "" || options.CorpusRoot == "" || options.OutputDir == "" || options.SourceRoot == "" {
 		return RunReport{}, fmt.Errorf("phase, corpus-root, output, and source-root are required")
 	}
-	phase, err := LoadPhase(options.PhasePath)
+	phasePath, err := filepath.Abs(options.PhasePath)
 	if err != nil {
 		return RunReport{}, err
 	}
-	outputDir, err := filepath.Abs(options.OutputDir)
+	corpusRoot, err := filepath.Abs(options.CorpusRoot)
 	if err != nil {
 		return RunReport{}, err
 	}
@@ -31,10 +31,18 @@ func Generate(options GenerateOptions) (RunReport, error) {
 	if err != nil {
 		return RunReport{}, err
 	}
+	outputDir, err := filepath.Abs(options.OutputDir)
+	if err != nil {
+		return RunReport{}, err
+	}
+	if !pathWithin(sourceRoot, phasePath) || !pathWithin(sourceRoot, corpusRoot) {
+		return RunReport{}, fmt.Errorf("phase and corpus must be read-only inputs inside source repository")
+	}
 	if pathWithin(sourceRoot, outputDir) {
 		return RunReport{}, fmt.Errorf("output directory must be caller-owned and outside source repository")
 	}
-	corpusRoot, err := filepath.Abs(options.CorpusRoot)
+
+	phase, err := LoadPhase(phasePath)
 	if err != nil {
 		return RunReport{}, err
 	}
@@ -57,7 +65,11 @@ func Generate(options GenerateOptions) (RunReport, error) {
 	}
 
 	summary := Summary{Generated: len(results)}
+	decisionVector := make([]string, 0, len(results))
+	effectVectors := make([]EffectVector, 0, len(results))
 	for _, result := range results {
+		decisionVector = append(decisionVector, result.Decision)
+		effectVectors = append(effectVectors, EffectVector{ID: result.ID, Effects: append([]string(nil), result.InferredEffects...)})
 		switch result.Decision {
 		case DecisionClosed:
 			summary.Closed++
@@ -70,6 +82,7 @@ func Generate(options GenerateOptions) (RunReport, error) {
 			summary.Failed++
 		}
 	}
+
 	generated := EmitChecker(phase, semantic, semanticDigest)
 	if err := os.MkdirAll(filepath.Join(outputDir, "generated"), 0o755); err != nil {
 		return RunReport{}, err
@@ -87,12 +100,22 @@ func Generate(options GenerateOptions) (RunReport, error) {
 		return RunReport{}, err
 	}
 	generatedArtifact := artifact("generated/checker.go", generated)
+	reportSchema := "gooo/capability-effect-checker/run-report/v2"
+	if phase.Version == 1 {
+		reportSchema = "gooo/capability-effect-checker/run-report/v1"
+	}
 	report := RunReport{
-		Schema: "gooo/capability-effect-checker/run-report/v1", PhaseDigest: phase.Digest,
-		SemanticIRDigest: semanticDigest, Precedence: append([]string(nil), phase.Precedence...), Generation: phase.Generation, Summary: summary, Cases: results,
-		Authority:          Authority{RepositoryWrites: 0, LocalTestExecutions: 0, CrossProjectRequiredGates: 0},
-		GeneratedArtifacts: []Artifact{generatedArtifact},
-		Artifacts:          []Artifact{artifact("semantic-ir.json", semanticBytes), generatedArtifact},
+		Schema: reportSchema, PhaseDigest: phase.Digest,
+		SemanticIRDigest: semanticDigest, Precedence: append([]string(nil), phase.Precedence...), FixedPoint: phase.FixedPoint,
+		Generation: phase.Generation, Summary: summary, DecisionVector: decisionVector, EffectVectors: effectVectors,
+		ProofCounts: countProofs(phase.Cells), IndicatorCounts: countIndicators(phase.Cells), CohortCounts: countCohorts(phase.Cells),
+		Cells: append([]Cell(nil), phase.Cells...), Cases: results,
+		Authority: Authority{RepositoryWrites: 0, LocalTestExecutions: 0, CrossProjectRequiredGates: 0},
+		Evidence: Evidence{
+			Improvement:     EvidenceStatus{Status: DecisionUnknown, Reason: "NO_SAME_SCENARIO_SOURCE_CONTRACT_TOOLCHAIN_BEFORE_AFTER_PAIR"},
+			ExternalUtility: EvidenceStatus{Status: DecisionUnknown, Reason: "NO_EXTERNAL_UTILITY_EVIDENCE"},
+		},
+		GeneratedArtifacts: []Artifact{generatedArtifact}, Artifacts: []Artifact{artifact("semantic-ir.json", semanticBytes), generatedArtifact},
 	}
 	reportBytes, err := PrettyJSON(report)
 	if err != nil {
@@ -113,12 +136,14 @@ func Generate(options GenerateOptions) (RunReport, error) {
 
 func RenderReport(report RunReport) string {
 	var out strings.Builder
-	out.WriteString("# Gooo capability effect checker run\n\n")
+	out.WriteString("# Gooo capability/effect attenuation run\n\n")
 	out.WriteString("- phase digest: `" + report.PhaseDigest + "`\n")
 	out.WriteString("- semantic IR digest: `" + report.SemanticIRDigest + "`\n")
 	out.WriteString("- decision precedence: `" + strings.Join(report.Precedence, " > ") + "`\n")
+	out.WriteString("- fixed point: `" + report.FixedPoint + "`\n")
 	out.WriteString("- generated cases: `" + fmt.Sprint(report.Summary.Generated) + "`\n")
 	out.WriteString("- CLOSED: `" + fmt.Sprint(report.Summary.Closed) + "`; UNKNOWN: `" + fmt.Sprint(report.Summary.Unknown) + "`; REFUTED: `" + fmt.Sprint(report.Summary.Refuted) + "`\n")
+	out.WriteString("- proof counts: `" + formatCounts(report.ProofCounts) + "`; indicator counts: `" + formatCounts(report.IndicatorCounts) + "`; case cohorts: `" + formatCounts(report.CohortCounts) + "`\n")
 	out.WriteString("- repository writes: `0`; local test executions: `0`; cross-project required gates: `0`\n\n")
 	for _, result := range report.Cases {
 		out.WriteString("## " + result.ID + " — " + result.Decision + "\n\n")
@@ -141,6 +166,43 @@ func RenderReport(report RunReport) string {
 		out.WriteString("\n")
 	}
 	return out.String()
+}
+
+func formatCounts(values map[string]int) string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, key+"="+fmt.Sprint(values[key]))
+	}
+	return strings.Join(parts, ",")
+}
+
+func countProofs(cells []Cell) map[string]int {
+	counts := make(map[string]int)
+	for _, cell := range cells {
+		counts[cell.Proof]++
+	}
+	return counts
+}
+
+func countIndicators(cells []Cell) map[string]int {
+	counts := make(map[string]int)
+	for _, cell := range cells {
+		counts[cell.Indicator]++
+	}
+	return counts
+}
+
+func countCohorts(cells []Cell) map[string]int {
+	counts := make(map[string]int)
+	for _, cell := range cells {
+		counts[cell.Cohort]++
+	}
+	return counts
 }
 
 func artifact(path string, data []byte) Artifact {

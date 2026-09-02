@@ -1,0 +1,12 @@
+gooo 2
+scenario unknown-generated-effect
+root metacode:generator
+function metacode:generator
+function generated:generator
+function runtime:generator
+direct metacode:generator READ_INPUT
+direct generated:generator GENERATED_EFFECT_UNKNOWN
+direct runtime:generator GENERATE_CALLER_OUTPUT
+call metacode:generator generated:generator
+call generated:generator runtime:generator
+output caller-owned

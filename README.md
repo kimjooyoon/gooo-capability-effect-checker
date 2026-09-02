@@ -1,28 +1,55 @@
-# Gooo capability effect checker
+# Gooo capability/effect attenuation checker
 
-This repository defines an executable Gooo capability/effect checker. Its
-`.gooo` metacode owns the effect vocabulary, capability grants, denominator,
-decision precedence, UNKNOWN frontier, and generation plan. Go is only the
-parser, executor, and emitter for that declaration.
+This repository extends the existing checker with one authority-preserving
+pipeline:
 
-The first `main` commit is the `BOOTSTRAP_EXCEPTION` from
-`gooo-repository-bootstrap` v0.1.1. Substantive implementation is introduced
-through one pull request and is validated by GitHub Actions with Go 1.27.
+`metacode (.gooo) → generated code → runtime`
 
-The checker computes the exact transitive effect set reachable from a root
-function, compares it with the declared grants, and records the shortest
-offending call path. It never scores permissions. A known repository, CI, or
-release mutation outside the grant is `REFUTED`; a missing indirect grant
-without a known mutation is `UNKNOWN`; an unavailable external oracle is
-`UNKNOWN`. Results reduce as `REFUTED > UNKNOWN > CLOSED`.
+The actual `.gooo` phase is the sole authority for capability grants, stage
+bindings, direct effect summaries, attenuation edges, caller-owned output
+scope, the denominator, proof/indicator cells, and decision precedence. Go
+provides only the parser, typechecker, evaluator, and deterministic emitter.
 
-All generated output is written to a caller-owned directory. The CI corpus
-contains a safe generator, a forbidden repository-write fixture, the two
-indirect-grant distinctions, and an external-oracle case. Local validation is
-not the evidence authority; the authoritative build, tests, conformance run,
-and metrics come from GitHub Actions.
+The typed effect vocabulary is exactly:
 
-## Run in CI
+`READ_INPUT`, `NETWORK_READ_PINNED`, `GENERATE_CALLER_OUTPUT`,
+`REPOSITORY_WRITE`, `REMOTE_MUTATION`, `DESTRUCTIVE_DELETE`.
+
+Every lower stage is checked against its upper grant and its declared
+attenuation edge. Generated or runtime code cannot mint a grant, widen a
+sibling/ancestor path, write the repository, mutate remotely, or delete
+destructively. Known forbidden effects are `REFUTED`; missing grants, missing
+call/attenuation edges, unknown generated effects, and missing path scope are
+`UNKNOWN` with exactly six fields. Decisions reduce as
+`REFUTED > UNKNOWN > CLOSED` at an explicit fixed point.
+
+The v2 denominator is exactly 12 cells: four FOUNDATION, four COHERENCE, and
+four REGRESSION cases. Proof quotas are FOUNDATION/COHERENCE/REGRESSION 4/4/4;
+indicator quotas are DRIVER/OUTCOME/GUARDRAIL 4/4/4. No aggregate score is
+computed.
+
+The previous five-case denominator is preserved in
+[`contracts/denominator-v1.json`](contracts/denominator-v1.json), and v2 is an
+append-only contract in
+[`contracts/denominator-v2.json`](contracts/denominator-v2.json). The public
+immutable v0.1.1 artifact is not rewritten. Its audit is recorded in
+[`docs/release-history-v1.md`](docs/release-history-v1.md).
+
+## CI authority
+
+Go 1.27.0, PR checks, and the post-merge `main` check are the only validation
+authority. Local verification and generation are intentionally not evidence
+(`0`). CI records exact integer wall time, peak RSS, inventory, output and
+generated-artifact counts/bytes, exact decision/effect vectors, and the three
+zero authority values: repository writes, local test executions, and
+cross-project required gates.
+
+The release workflow checks PR-first lineage and caller-owned output before
+any remote mutation, creates the next patch release as a draft, audits its
+asset digests, and only then publishes the immutable release. Existing public
+releases are append-only.
+
+## CI command
 
 ```text
 go run ./cmd/gooo-capability-effect-checker generate \
@@ -32,8 +59,7 @@ go run ./cmd/gooo-capability-effect-checker generate \
   --source-root .
 ```
 
-The generated report contains exact inferred effects, declared grants,
-shortest offending paths, and the complete six-field UNKNOWN frontier. The
-bootstrap lock is recorded in
-[`contracts/bootstrap-lock-v1.json`](contracts/bootstrap-lock-v1.json), and
-the protocol is described in [`docs/rfc-v1.md`](docs/rfc-v1.md).
+The generated report contains stage results, attenuation evidence, exact
+vectors, shortest offending paths, and complete UNKNOWN frontiers. The
+command is invoked by CI into caller-owned temporary space; the command above
+is documentation only and is not local evidence.

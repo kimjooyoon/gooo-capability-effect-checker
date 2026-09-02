@@ -1,0 +1,15 @@
+gooo 2
+scenario destructive-ancestor-delete
+root metacode:generator
+function metacode:generator
+function generated:generator
+function runtime:generator
+function metacode:cleanup
+direct metacode:generator READ_INPUT
+direct generated:generator GENERATE_CALLER_OUTPUT
+direct runtime:generator GENERATE_CALLER_OUTPUT
+direct metacode:cleanup DESTRUCTIVE_DELETE
+call metacode:generator generated:generator
+call generated:generator runtime:generator
+call generated:generator metacode:cleanup
+output caller-owned

@@ -1,53 +1,248 @@
-gooo 1
+gooo 2
 package capability_effect_checker
-namespace gooo://capability-effect-checker/v1
+namespace gooo://capability-effect-checker/v2
 
-# This file is the semantic authority. Go parses, executes, and emits it.
+# This file is the only semantic authority. Go is parser, typechecker,
+# evaluator, and generator; no Go source may mint a capability or effect.
 effect READ_INPUT
-effect WRITE_CALLER_OUTPUT
+effect NETWORK_READ_PINNED
+effect GENERATE_CALLER_OUTPUT
 effect REPOSITORY_WRITE
-effect NETWORK
-effect CI_MUTATION
-effect RELEASE_MUTATION
+effect REMOTE_MUTATION
+effect DESTRUCTIVE_DELETE
 
 capability generator
 capability helper
-capability policy-checker
+capability cleanup
+
+stage METACODE
+stage GENERATED_CODE
+stage RUNTIME
+stage_edge METACODE GENERATED_CODE
+stage_edge GENERATED_CODE RUNTIME
+output_scope caller-owned
 
 precedence REFUTED UNKNOWN CLOSED
 unknown_fields stage step reason unknown_class next_operation blocked_by
-risk_effects REPOSITORY_WRITE CI_MUTATION RELEASE_MUTATION
+risk_effects REPOSITORY_WRITE REMOTE_MUTATION DESTRUCTIVE_DELETE
+fixed_point explicit
 
-classification direct_undeclared_effect REFUTED
-classification declared_grant_omission REFUTED
-classification forbidden_mutation REFUTED
-classification missing_indirect_grant UNKNOWN
-classification external_oracle_dependency UNKNOWN
+classification missing_grant UNKNOWN
+classification missing_call_edge UNKNOWN
+classification unknown_generated_effect UNKNOWN
+classification missing_path_scope UNKNOWN
+classification missing_effect_summary UNKNOWN
 classification unknown_call_target UNKNOWN
+classification external_oracle_dependency UNKNOWN
+classification direct_undeclared_effect REFUTED
+classification effect_summary_mismatch REFUTED
+classification grant_amplification REFUTED
+classification forbidden_effect REFUTED
+classification path_scope_expansion REFUTED
+classification sibling_path_expansion REFUTED
+classification destructive_ancestor_delete REFUTED
+classification forged_grant REFUTED
+classification output_scope_violation REFUTED
 classification call_graph_cycle REFUTED
+classification input_contract_mismatch REFUTED
 
-diagnostic direct_undeclared_effect EFFECTS CHECK_EFFECT_VOCABULARY EFFECT_NOT_IN_EFFECT_SET UNDECLARED_EFFECT DECLARE_EFFECT EFFECT_NAME
-diagnostic declared_grant_omission GRANTS CHECK_DECLARED_GRANT DECLARED_EFFECT_ESCAPES_GRANT GRANT_MISMATCH REVISE_GRANT DECLARED_GRANT
-diagnostic forbidden_mutation EFFECTS CHECK_MUTATION_GRANT FORBIDDEN_MUTATION_ESCAPES_GRANT EFFECT_ESCALATION REJECT_CALL_PATH CALL_PATH
-diagnostic missing_indirect_grant GRANTS CHECK_CALLEE_GRANT INDIRECT_GRANT_MISSING INDIRECT_GRANT DECLARE_CALLEE_GRANT CALLEE_GRANT
-diagnostic external_oracle_dependency ORACLE RESOLVE_EXTERNAL_ORACLE EXTERNAL_ORACLE_UNAVAILABLE EXTERNAL_ORACLE RETRY_EXTERNAL_ORACLE ORACLE_RESPONSE
-diagnostic unknown_call_target GRAPH RESOLVE_CALL_TARGET CALL_TARGET_MISSING UNRESOLVED_CALL DECLARE_TARGET CALL_TARGET
-diagnostic call_graph_cycle GRAPH CHECK_CALL_GRAPH_CYCLE CALL_GRAPH_CYCLE GRAPH_CYCLE REPAIR_CALL_GRAPH CALL_PATH
+diagnostic missing_grant GRANTS CHECK_STAGE_GRANT STAGE_GRANT_MISSING MISSING_GRANT DECLARE_STAGE_GRANT STAGE_GRANT
+diagnostic missing_call_edge GRAPH CHECK_ATTENUATION_EDGE CALL_EDGE_AMBIGUOUS MISSING_CALL_EDGE DECLARE_ATTENUATION_EDGE CALL_EDGE
+diagnostic unknown_generated_effect GENERATED_CODE CHECK_GENERATED_EFFECT UNKNOWN_GENERATED_EFFECT UNKNOWN_GENERATED_EFFECT RESOLVE_GENERATED_EFFECT GENERATED_EFFECT
+diagnostic missing_path_scope RUNTIME CHECK_CALLER_SCOPE PATH_SCOPE_MISSING MISSING_PATH_SCOPE DECLARE_CALLER_SCOPE CALLER_SCOPE
+diagnostic missing_effect_summary GENERATED_CODE CHECK_EFFECT_SUMMARY EFFECT_SUMMARY_MISSING MISSING_EFFECT_SUMMARY DECLARE_EFFECT_SUMMARY EFFECT_SUMMARY
+diagnostic unknown_call_target GRAPH RESOLVE_CALL_TARGET CALL_TARGET_MISSING UNKNOWN_CALL_TARGET DECLARE_CALL_TARGET CALL_TARGET
+diagnostic external_oracle_dependency RUNTIME RESOLVE_EXTERNAL_ORACLE EXTERNAL_ORACLE_UNAVAILABLE EXTERNAL_ORACLE RETRY_EXTERNAL_ORACLE ORACLE_RESPONSE
+diagnostic direct_undeclared_effect GENERATED_CODE CHECK_EFFECT_VOCABULARY EFFECT_NOT_IN_EFFECT_SET UNDECLARED_EFFECT DECLARE_EFFECT EFFECT_NAME
+diagnostic effect_summary_mismatch GENERATED_CODE CHECK_EFFECT_SUMMARY EFFECT_SUMMARY_CONTRADICTION EFFECT_SUMMARY_CONTRADICTION REVISE_EFFECT_SUMMARY EFFECT_SUMMARY
+diagnostic grant_amplification GENERATED_CODE CHECK_ATTENUATION_GRANT GRANT_AMPLIFICATION GRANT_AMPLIFICATION REVISE_ATTENUATION_GRANT GRANT
+diagnostic forbidden_effect RUNTIME CHECK_FORBIDDEN_EFFECT FORBIDDEN_EFFECT_ESCAPES_GRANT FORBIDDEN_EFFECT REJECT_CALL_PATH CALL_PATH
+diagnostic path_scope_expansion GENERATED_CODE CHECK_PATH_SCOPE PATH_SCOPE_EXPANSION PATH_SCOPE_EXPANSION REJECT_CALL_PATH CALL_PATH
+diagnostic sibling_path_expansion GENERATED_CODE CHECK_PATH_SCOPE SIBLING_SCOPE_EXPANSION SIBLING_SCOPE_EXPANSION REJECT_CALL_PATH CALL_PATH
+diagnostic destructive_ancestor_delete RUNTIME CHECK_PATH_SCOPE DESTRUCTIVE_ANCESTOR_DELETE DESTRUCTIVE_ANCESTOR_DELETE REJECT_CALL_PATH CALL_PATH
+diagnostic forged_grant GENERATED_CODE CHECK_GRANT_ORIGIN FORGED_GRANT FORGED_GRANT REJECT_GENERATED_GRANT GRANT_ORIGIN
+diagnostic output_scope_violation RUNTIME CHECK_CALLER_SCOPE OUTPUT_SCOPE_VIOLATION OUTPUT_SCOPE_VIOLATION REJECT_OUTPUT OUTPUT_SCOPE
+diagnostic call_graph_cycle GRAPH CHECK_CALL_GRAPH_CYCLE CALL_GRAPH_CYCLE CALL_GRAPH_CYCLE REPAIR_CALL_GRAPH CALL_PATH
+diagnostic input_contract_mismatch GRAPH CHECK_INPUT_CONTRACT INPUT_CONTRACT_MISMATCH INPUT_CONTRACT_MISMATCH REPAIR_INPUT_CONTRACT INPUT_CONTRACT
 
-denominator cases 5
-case safe-generator safe-generator.gooo CLOSED generator generator
-case repository-write-escalation repository-write-escalation.gooo REFUTED generator generator
-case indirect-missing-grant indirect-missing-grant.gooo UNKNOWN generator generator
-case indirect-repository-write indirect-repository-write.gooo REFUTED generator generator
-case external-oracle external-oracle.gooo UNKNOWN generator generator
+denominator cases 12
+proof FOUNDATION 4
+proof COHERENCE 4
+proof REGRESSION 4
+indicator DRIVER 4
+indicator OUTCOME 4
+indicator GUARDRAIL 4
 
-grant safe-generator generator READ_INPUT WRITE_CALLER_OUTPUT
-grant safe-generator helper READ_INPUT
-grant repository-write-escalation generator READ_INPUT WRITE_CALLER_OUTPUT
-grant indirect-missing-grant generator READ_INPUT NETWORK WRITE_CALLER_OUTPUT
-grant indirect-repository-write generator READ_INPUT WRITE_CALLER_OUTPUT
-grant external-oracle generator READ_INPUT WRITE_CALLER_OUTPUT
+case exact-attenuation exact-attenuation.gooo CLOSED metacode:generator generator FOUNDATION
+case zero-effect-generated zero-effect-generated.gooo CLOSED metacode:generator generator FOUNDATION
+case caller-owned-output caller-owned-output.gooo CLOSED metacode:generator generator FOUNDATION
+case pinned-network-read pinned-network-read.gooo CLOSED metacode:generator generator FOUNDATION
+case missing-grant missing-grant.gooo UNKNOWN metacode:generator generator COHERENCE
+case missing-call-edge missing-call-edge.gooo UNKNOWN metacode:generator generator COHERENCE
+case unknown-generated-effect unknown-generated-effect.gooo UNKNOWN metacode:generator generator COHERENCE
+case missing-path-scope missing-path-scope.gooo UNKNOWN metacode:generator generator COHERENCE
+case repo-write-amplification repo-write-amplification.gooo REFUTED metacode:generator generator REGRESSION
+case remote-mutation-amplification remote-mutation-amplification.gooo REFUTED metacode:generator generator REGRESSION
+case destructive-ancestor-delete destructive-ancestor-delete.gooo REFUTED metacode:generator generator REGRESSION
+case forged-grant forged-grant.gooo REFUTED metacode:generator generator REGRESSION
 
-plan parser executor emitter
+cell exact-attenuation exact-attenuation FOUNDATION FOUNDATION DRIVER attenuation-exact
+cell zero-effect-generated zero-effect-generated FOUNDATION FOUNDATION DRIVER zero-effect-generated
+cell caller-owned-output caller-owned-output FOUNDATION FOUNDATION DRIVER caller-owned-output
+cell pinned-network-read pinned-network-read FOUNDATION FOUNDATION DRIVER pinned-network-read
+cell missing-grant missing-grant COHERENCE COHERENCE OUTCOME missing-grant
+cell missing-call-edge missing-call-edge COHERENCE COHERENCE OUTCOME missing-call-edge
+cell unknown-generated-effect unknown-generated-effect COHERENCE COHERENCE OUTCOME unknown-generated-effect
+cell missing-path-scope missing-path-scope COHERENCE COHERENCE OUTCOME missing-path-scope
+cell repo-write-amplification repo-write-amplification REGRESSION REGRESSION GUARDRAIL repo-write-amplification
+cell remote-mutation-amplification remote-mutation-amplification REGRESSION REGRESSION GUARDRAIL remote-mutation-amplification
+cell destructive-ancestor-delete destructive-ancestor-delete REGRESSION REGRESSION GUARDRAIL destructive-ancestor-delete
+cell forged-grant forged-grant REGRESSION REGRESSION GUARDRAIL forged-grant
+
+# Activity bindings make stage and capability authority explicit in .gooo.
+activity exact-attenuation METACODE generator metacode:generator metacode-generate
+activity exact-attenuation GENERATED_CODE generator generated:generator generated-emit
+activity exact-attenuation RUNTIME generator runtime:generator runtime-execute
+activity zero-effect-generated METACODE generator metacode:generator metacode-generate
+activity zero-effect-generated GENERATED_CODE generator generated:generator generated-emit
+activity zero-effect-generated RUNTIME generator runtime:generator runtime-execute
+activity caller-owned-output METACODE generator metacode:generator metacode-generate
+activity caller-owned-output GENERATED_CODE generator generated:generator generated-emit
+activity caller-owned-output RUNTIME generator runtime:generator runtime-execute
+activity pinned-network-read METACODE generator metacode:generator metacode-generate
+activity pinned-network-read GENERATED_CODE generator generated:generator generated-emit
+activity pinned-network-read RUNTIME generator runtime:generator runtime-execute
+activity missing-grant METACODE generator metacode:generator metacode-generate
+activity missing-grant GENERATED_CODE generator generated:generator generated-emit
+activity missing-grant RUNTIME generator runtime:generator runtime-execute
+activity missing-call-edge METACODE generator metacode:generator metacode-generate
+activity missing-call-edge GENERATED_CODE generator generated:generator generated-emit
+activity missing-call-edge RUNTIME generator runtime:generator runtime-execute
+activity unknown-generated-effect METACODE generator metacode:generator metacode-generate
+activity unknown-generated-effect GENERATED_CODE generator generated:generator generated-emit
+activity unknown-generated-effect RUNTIME generator runtime:generator runtime-execute
+activity missing-path-scope METACODE generator metacode:generator metacode-generate
+activity missing-path-scope GENERATED_CODE generator generated:generator generated-emit
+activity missing-path-scope RUNTIME generator runtime:generator runtime-execute
+activity repo-write-amplification METACODE generator metacode:generator metacode-generate
+activity repo-write-amplification GENERATED_CODE generator generated:generator generated-emit
+activity repo-write-amplification RUNTIME generator runtime:generator runtime-execute
+activity remote-mutation-amplification METACODE generator metacode:generator metacode-generate
+activity remote-mutation-amplification GENERATED_CODE generator generated:generator generated-emit
+activity remote-mutation-amplification RUNTIME generator runtime:generator runtime-execute
+activity destructive-ancestor-delete METACODE generator metacode:generator metacode-generate
+activity destructive-ancestor-delete GENERATED_CODE generator generated:generator generated-emit
+activity destructive-ancestor-delete RUNTIME generator runtime:generator runtime-execute
+activity destructive-ancestor-delete METACODE cleanup metacode:cleanup cleanup
+activity forged-grant METACODE generator metacode:generator metacode-generate
+activity forged-grant GENERATED_CODE generator generated:generator generated-emit
+activity forged-grant RUNTIME generator runtime:generator runtime-execute
+
+# The summary is direct effect evidence for each bound activity.
+effect_summary exact-attenuation METACODE generator READ_INPUT
+effect_summary exact-attenuation GENERATED_CODE generator READ_INPUT
+effect_summary exact-attenuation RUNTIME generator GENERATE_CALLER_OUTPUT
+effect_summary zero-effect-generated METACODE generator READ_INPUT
+effect_summary zero-effect-generated GENERATED_CODE generator NONE
+effect_summary zero-effect-generated RUNTIME generator GENERATE_CALLER_OUTPUT
+effect_summary caller-owned-output METACODE generator READ_INPUT
+effect_summary caller-owned-output GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+effect_summary caller-owned-output RUNTIME generator GENERATE_CALLER_OUTPUT
+effect_summary pinned-network-read METACODE generator READ_INPUT
+effect_summary pinned-network-read GENERATED_CODE generator NETWORK_READ_PINNED
+effect_summary pinned-network-read RUNTIME generator NONE
+effect_summary missing-grant METACODE generator READ_INPUT
+effect_summary missing-grant GENERATED_CODE generator NETWORK_READ_PINNED
+effect_summary missing-grant RUNTIME generator GENERATE_CALLER_OUTPUT
+effect_summary missing-call-edge METACODE generator READ_INPUT
+effect_summary missing-call-edge GENERATED_CODE generator READ_INPUT
+effect_summary missing-call-edge RUNTIME generator GENERATE_CALLER_OUTPUT
+effect_summary unknown-generated-effect METACODE generator READ_INPUT
+effect_summary unknown-generated-effect GENERATED_CODE generator NONE
+effect_summary unknown-generated-effect RUNTIME generator GENERATE_CALLER_OUTPUT
+effect_summary missing-path-scope METACODE generator READ_INPUT
+effect_summary missing-path-scope GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+effect_summary missing-path-scope RUNTIME generator NONE
+effect_summary repo-write-amplification METACODE generator READ_INPUT
+effect_summary repo-write-amplification GENERATED_CODE generator REPOSITORY_WRITE
+effect_summary repo-write-amplification RUNTIME generator GENERATE_CALLER_OUTPUT
+effect_summary remote-mutation-amplification METACODE generator READ_INPUT
+effect_summary remote-mutation-amplification GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+effect_summary remote-mutation-amplification RUNTIME generator REMOTE_MUTATION
+effect_summary destructive-ancestor-delete METACODE generator READ_INPUT
+effect_summary destructive-ancestor-delete GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+effect_summary destructive-ancestor-delete RUNTIME generator GENERATE_CALLER_OUTPUT
+effect_summary destructive-ancestor-delete METACODE cleanup DESTRUCTIVE_DELETE
+effect_summary forged-grant METACODE generator READ_INPUT
+effect_summary forged-grant GENERATED_CODE generator NONE
+effect_summary forged-grant RUNTIME generator GENERATE_CALLER_OUTPUT
+
+# Stage grants are monotonically attenuated; a missing row is intentionally an
+# UNKNOWN frontier in the missing-grant cell.
+grant exact-attenuation METACODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+grant exact-attenuation GENERATED_CODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+grant exact-attenuation RUNTIME generator GENERATE_CALLER_OUTPUT
+grant zero-effect-generated METACODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+grant zero-effect-generated GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+grant zero-effect-generated RUNTIME generator GENERATE_CALLER_OUTPUT
+grant caller-owned-output METACODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+grant caller-owned-output GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+grant caller-owned-output RUNTIME generator GENERATE_CALLER_OUTPUT
+grant pinned-network-read METACODE generator READ_INPUT NETWORK_READ_PINNED
+grant pinned-network-read GENERATED_CODE generator NETWORK_READ_PINNED
+grant pinned-network-read RUNTIME generator NONE
+grant missing-grant METACODE generator READ_INPUT NETWORK_READ_PINNED GENERATE_CALLER_OUTPUT
+grant missing-grant RUNTIME generator GENERATE_CALLER_OUTPUT
+grant missing-call-edge METACODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+grant missing-call-edge GENERATED_CODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+grant missing-call-edge RUNTIME generator GENERATE_CALLER_OUTPUT
+grant unknown-generated-effect METACODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+grant unknown-generated-effect GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+grant unknown-generated-effect RUNTIME generator GENERATE_CALLER_OUTPUT
+grant missing-path-scope METACODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+grant missing-path-scope GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+grant missing-path-scope RUNTIME generator GENERATE_CALLER_OUTPUT
+grant repo-write-amplification METACODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+grant repo-write-amplification GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+grant repo-write-amplification RUNTIME generator GENERATE_CALLER_OUTPUT
+grant remote-mutation-amplification METACODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+grant remote-mutation-amplification GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+grant remote-mutation-amplification RUNTIME generator GENERATE_CALLER_OUTPUT
+grant destructive-ancestor-delete METACODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+grant destructive-ancestor-delete GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+grant destructive-ancestor-delete RUNTIME generator GENERATE_CALLER_OUTPUT
+grant destructive-ancestor-delete METACODE cleanup DESTRUCTIVE_DELETE
+grant forged-grant METACODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+grant forged-grant GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+grant forged-grant RUNTIME generator GENERATE_CALLER_OUTPUT
+
+attenuation exact-attenuation METACODE GENERATED_CODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+attenuation exact-attenuation GENERATED_CODE RUNTIME generator GENERATE_CALLER_OUTPUT
+attenuation zero-effect-generated METACODE GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+attenuation zero-effect-generated GENERATED_CODE RUNTIME generator GENERATE_CALLER_OUTPUT
+attenuation caller-owned-output METACODE GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+attenuation caller-owned-output GENERATED_CODE RUNTIME generator GENERATE_CALLER_OUTPUT
+attenuation pinned-network-read METACODE GENERATED_CODE generator NETWORK_READ_PINNED
+attenuation pinned-network-read GENERATED_CODE RUNTIME generator NONE
+attenuation missing-grant METACODE GENERATED_CODE generator NETWORK_READ_PINNED GENERATE_CALLER_OUTPUT
+attenuation missing-grant GENERATED_CODE RUNTIME generator GENERATE_CALLER_OUTPUT
+attenuation missing-call-edge METACODE GENERATED_CODE generator READ_INPUT GENERATE_CALLER_OUTPUT
+attenuation unknown-generated-effect METACODE GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+attenuation unknown-generated-effect GENERATED_CODE RUNTIME generator GENERATE_CALLER_OUTPUT
+attenuation missing-path-scope METACODE GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+attenuation missing-path-scope GENERATED_CODE RUNTIME generator GENERATE_CALLER_OUTPUT
+attenuation repo-write-amplification METACODE GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+attenuation repo-write-amplification GENERATED_CODE RUNTIME generator GENERATE_CALLER_OUTPUT
+attenuation remote-mutation-amplification METACODE GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+attenuation remote-mutation-amplification GENERATED_CODE RUNTIME generator GENERATE_CALLER_OUTPUT
+attenuation destructive-ancestor-delete METACODE GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+attenuation destructive-ancestor-delete GENERATED_CODE RUNTIME generator GENERATE_CALLER_OUTPUT
+attenuation forged-grant METACODE GENERATED_CODE generator GENERATE_CALLER_OUTPUT
+attenuation forged-grant GENERATED_CODE RUNTIME generator GENERATE_CALLER_OUTPUT
+
+authority repository_writes 0
+authority local_test_executions 0
+authority cross_project_required_gates 0
+plan parser typechecker evaluator
 generation output caller-owned-temporary-directory
-generation steps parse-phase parse-fixtures infer-call-graph compare-grants emit-checker write-report
+generation steps parse-phase typecheck-phase evaluate-effects validate-attenuation emit-checker write-report

@@ -8,7 +8,7 @@ on:
       tag_name:
         description: 'Existing annotated tag to publish'
         required: true
-        default: 'v0.1.1'
+        default: 'v0.1.2'
 
 permissions:
   contents: write
@@ -36,6 +36,15 @@ jobs:
           test "$(git cat-file -t "$tag_object")" = tag
           tag_commit=$(git rev-list -n 1 "${tag_object}^{commit}")
           test "$tag_commit" = "$(git rev-parse HEAD)"
+
+      - name: Guard release lineage and output authority before mutation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/gooo-capability-effect-checker-release"
+          mkdir -p "$work"
+          bash scripts/verify-release-lineage.sh "$GITHUB_WORKSPACE"
+          bash scripts/verify-output-authority.sh "$GITHUB_WORKSPACE" "$work"
 
       - name: Set up Go 1.27.0
         uses: actions/setup-go@v6
@@ -76,21 +85,38 @@ jobs:
             --argjson metrics_bytes "$(stat -c '%s' "$work/ci-metrics.json")" \
             --arg run_report_digest "sha256:$(sha256sum "$work/run-report.json" | awk '{print $1}')" \
             --argjson run_report_bytes "$(stat -c '%s' "$work/run-report.json")" \
-            '{schema:"gooo/capability-effect-checker/release-manifest/v1",tag:$tag,commit:$commit,annotated_tag_object:$tag_object,immutable:true,assets:[{name:$source_name,bytes:$source_bytes,digest:$source_digest},{name:"ci-metrics.json",bytes:$metrics_bytes,digest:$metrics_digest},{name:"run-report.json",bytes:$run_report_bytes,digest:$run_report_digest}],authority:{repository_writes:0,local_test_executions:0,cross_project_required_gates:0}}' \
+            --arg phase_digest "sha256:$(sha256sum .gooo/capability-effect-checker.gooo | awk '{print $1}')" \
+            --arg semantic_ir_digest "$(jq -r '.semantic_ir_digest' "$work/run-report.json")" \
+            '{schema:"gooo/capability-effect-checker/release-manifest/v2",tag:$tag,commit:$commit,annotated_tag_object:$tag_object,immutable:true,lineage:{phase_digest:$phase_digest,semantic_ir_digest:$semantic_ir_digest,ci_metrics_digest:$metrics_digest,run_report_digest:$run_report_digest},assets:[{name:$source_name,bytes:$source_bytes,digest:$source_digest},{name:"ci-metrics.json",bytes:$metrics_bytes,digest:$metrics_digest},{name:"run-report.json",bytes:$run_report_bytes,digest:$run_report_digest}],authority:{repository_writes:0,local_test_executions:0,cross_project_required_gates:0}}' \
             > "$work/release-manifest.json"
           (cd "$work" && sha256sum "$(basename "$source_asset")" ci-metrics.json run-report.json release-manifest.json) > "$work/SHA256SUMS"
 
-      - name: Publish release once
+      - name: Create draft release once
         shell: bash
         run: |
           set -Eeuo pipefail
           work="$RUNNER_TEMP/gooo-capability-effect-checker-release"
           gh release create "$RELEASE_TAG" \
             --verify-tag \
+            --draft \
             --title "gooo-capability-effect-checker $RELEASE_TAG" \
             --notes "Immutable capability/effect checker release for annotated commit $(git rev-parse HEAD)." \
             "$work/gooo-capability-effect-checker-${RELEASE_TAG#v}.tar.gz" \
             "$work/ci-metrics.json" "$work/run-report.json" "$work/release-manifest.json" "$work/SHA256SUMS"
+
+      - name: Audit draft assets and publish immutable release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          work="$RUNNER_TEMP/gooo-capability-effect-checker-release"
+          draft=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")
+          test "$(jq -r '.draft' <<<"$draft")" = true
+          for asset in "gooo-capability-effect-checker-${RELEASE_TAG#v}.tar.gz" ci-metrics.json run-report.json release-manifest.json SHA256SUMS; do
+            expected="sha256:$(sha256sum "$work/$asset" | awk '{print $1}')"
+            actual=$(jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .digest' <<<"$draft")
+            test "$actual" = "$expected"
+          done
+          gh release edit "$RELEASE_TAG" --draft=false
 
       - name: Audit immutable release through GitHub API
         shell: bash
@@ -111,7 +137,11 @@ jobs:
           done
           jq -n --arg tag "$RELEASE_TAG" --arg tag_object "$tag_object" \
             --arg commit "$(git rev-parse HEAD)" --argjson release "$(jq '{id,tag_name,immutable,assets:[.assets[] | {id,name,size,digest}]}' <<<"$release")" \
-            '{schema:"gooo/capability-effect-checker/github-release-audit/v1",tag:$tag,annotated_tag_object:$tag_object,commit:$commit,release:$release}' \
+            --arg phase_digest "sha256:$(sha256sum .gooo/capability-effect-checker.gooo | awk '{print $1}')" \
+            --arg semantic_ir_digest "$(jq -r '.semantic_ir_digest' "$work/run-report.json")" \
+            --arg ci_metrics_digest "$(jq -r '.assets[] | select(.name == "ci-metrics.json") | .digest' <<<"$release")" \
+            --arg run_report_digest "$(jq -r '.assets[] | select(.name == "run-report.json") | .digest' <<<"$release")" \
+            '{schema:"gooo/capability-effect-checker/github-release-audit/v2",tag:$tag,annotated_tag_object:$tag_object,commit:$commit,lineage:{phase_digest:$phase_digest,semantic_ir_digest:$semantic_ir_digest,ci_metrics_digest:$ci_metrics_digest,run_report_digest:$run_report_digest},release:$release}' \
             > "$work/release-audit.json"
 
       - name: Upload release evidence

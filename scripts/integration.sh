@@ -5,6 +5,7 @@ root=${1:?repository root is required}
 work=${2:?caller-owned work directory is required}
 bin=${3:?checker binary is required}
 out="$work/integration-output"
+bash "$(dirname "$0")/verify-output-authority.sh" "$root" "$out"
 mkdir -p "$out"
 
 before=$(git -C "$root" status --porcelain=v1 -z --untracked-files=all | sha256sum | awk '{print $1}')
@@ -13,7 +14,7 @@ before=$(git -C "$root" status --porcelain=v1 -z --untracked-files=all | sha256s
 	--corpus-root "$root/examples/corpus" \
 	--out "$out" \
 	--source-root "$root"
-jq -e '.summary == {generated:5,closed:1,unknown:2,refuted:2,failed:0}' "$out/run-report.json" > /dev/null
+jq -e '.summary == {generated:12,closed:4,unknown:4,refuted:4,failed:0} and .decision_vector == ["CLOSED","CLOSED","CLOSED","CLOSED","UNKNOWN","UNKNOWN","UNKNOWN","UNKNOWN","REFUTED","REFUTED","REFUTED","REFUTED"]' "$out/run-report.json" > /dev/null
 
 forbidden="$root/.gooo-repository-write-fixture-output"
 if "$bin" generate \

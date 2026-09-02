@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout exact subject
         uses: actions/checkout@v5
@@ -33,6 +34,13 @@ jobs:
           set -Eeuo pipefail
           test "$(go env GOVERSION)" = "go1.27.0"
           test -z "$(git status --porcelain=v1)"
+
+      - name: Verify PR-first lineage and output authority
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          bash scripts/verify-ci-lineage.sh "$GITHUB_WORKSPACE" "$SUBJECT_SHA"
+          bash scripts/verify-output-authority.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/gooo-capability-effect-checker"
 
       - name: Verify Go formatting and vet
         shell: bash
@@ -88,7 +96,7 @@ jobs:
           set -Eeuo pipefail
           work="$RUNNER_TEMP/gooo-capability-effect-checker"
           ./scripts/write-metrics.sh "$GITHUB_WORKSPACE" "$work" "$work/ci-metrics.json"
-          jq -e '
+          jq -e --arg expected_commit "$SUBJECT_SHA" '
             (.inventory.go_files | type == "number" and floor == .) and
             (.inventory.gooo_files | type == "number" and floor == .) and
             (.inventory.go_physical_lines | type == "number" and floor == .) and
@@ -107,9 +115,14 @@ jobs:
             (.wall_ms.test | type == "number" and floor == .) and
             (.wall_ms.conformance | type == "number" and floor == .) and
             (.wall_ms.integration | type == "number" and floor == .) and
-            (.tests.total == 5 and .tests.selected == 5 and .tests.executed == 5 and .tests.reused == 0 and .tests.failed == 0 and .tests.unknown == 2) and
+            (.tests.total == 12 and .tests.selected == 12 and .tests.executed == 12 and .tests.reused == 0 and .tests.failed == 0 and .tests.unknown == 4) and
             (.authority.repository_writes == 0 and .authority.local_test_executions == 0 and .authority.cross_project_required_gates == 0) and
-            (.improvement.status == "UNKNOWN")
+            (.lineage.source_commit == $expected_commit) and
+            (.lineage.phase_digest | startswith("sha256:")) and
+            (.lineage.semantic_ir_digest | startswith("sha256:")) and
+            (.lineage.run_report_digest | startswith("sha256:")) and
+            (.improvement.status == "UNKNOWN") and
+            (.external_utility.status == "UNKNOWN")
           ' "$work/ci-metrics.json"
 
       - name: Publish human report to job summary

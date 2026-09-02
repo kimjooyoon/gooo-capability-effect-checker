@@ -1,0 +1,13 @@
+gooo 2
+scenario pinned-network-read
+root metacode:generator
+function metacode:generator
+function generated:generator
+function runtime:generator
+direct metacode:generator READ_INPUT
+direct generated:generator NETWORK_READ_PINNED
+direct runtime:generator NONE
+call metacode:generator generated:generator
+call generated:generator runtime:generator
+network generated:generator pinned
+output caller-owned
